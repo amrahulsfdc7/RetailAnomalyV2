@@ -1,0 +1,218 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Flow xmlns="http://soap.sforce.com/2006/04/metadata">
+    <apiVersion>60.0</apiVersion>
+    <description>Logic Flow: Accepts inputs (UserId, IP) to simulate an anomaly event. Usable for testing and production.</description>
+    <label>Api Anomaly Logic (Testable)</label>
+    <processType>AutoLaunchedFlow</processType>
+
+    <variables>
+        <name>var_UserId</name>
+        <dataType>String</dataType>
+        <isCollection>false</isCollection>
+        <isInput>true</isInput> <isOutput>false</isOutput>
+    </variables>
+
+    <variables>
+        <name>var_SourceIp</name>
+        <dataType>String</dataType>
+        <isCollection>false</isCollection>
+        <isInput>true</isInput>
+        <isOutput>false</isOutput>
+    </variables>
+
+    <variables>
+        <name>RecipientIds</name>
+        <dataType>String</dataType>
+        <isCollection>true</isCollection>
+        <isInput>false</isInput>
+        <isOutput>false</isOutput>
+    </variables>
+
+    <recordLookups>
+        <name>Get_User_Details</name>
+        <label>Get User Details</label>
+        <locationX>176</locationX>
+        <locationY>134</locationY>
+        <assignNullValuesIfNoRecordsFound>false</assignNullValuesIfNoRecordsFound>
+        <connector>
+            <targetReference>Get_Notification_Type</targetReference>
+        </connector>
+        <filterLogic>and</filterLogic>
+        <filters>
+            <field>Id</field>
+            <operator>EqualTo</operator>
+            <value>
+                <elementReference>var_UserId</elementReference>
+            </value>
+        </filters>
+        <getFirstRecordOnly>true</getFirstRecordOnly>
+        <object>User</object>
+        <storeOutputAutomatically>true</storeOutputAutomatically>
+        <queriedFields>Id</queriedFields>
+        <queriedFields>Username</queriedFields>
+        <queriedFields>FirstName</queriedFields>
+        <queriedFields>Email</queriedFields>
+        <queriedFields>LanguageLocaleKey</queriedFields>
+    </recordLookups>
+
+    <recordLookups>
+        <name>Get_Notification_Type</name>
+        <label>Get Notification Type</label>
+        <locationX>176</locationX>
+        <locationY>242</locationY>
+        <assignNullValuesIfNoRecordsFound>false</assignNullValuesIfNoRecordsFound>
+        <connector>
+            <targetReference>Assign_Recipient_ID</targetReference>
+        </connector>
+        <filterLogic>and</filterLogic>
+        <filters>
+            <field>DeveloperName</field>
+            <operator>EqualTo</operator>
+            <value>
+                <stringValue>Security_Alert</stringValue>
+            </value>
+        </filters>
+        <getFirstRecordOnly>true</getFirstRecordOnly>
+        <object>CustomNotificationType</object>
+        <storeOutputAutomatically>true</storeOutputAutomatically>
+    </recordLookups>
+
+    <assignments>
+        <name>Assign_Recipient_ID</name>
+        <label>Assign Recipient ID</label>
+        <locationX>176</locationX>
+        <locationY>350</locationY>
+        <assignmentItems>
+            <assignToReference>RecipientIds</assignToReference>
+            <operator>Add</operator>
+            <value>
+                <elementReference>Get_User_Details.Id</elementReference>
+            </value>
+        </assignmentItems>
+        <connector>
+            <targetReference>Send_Bell_Notification</targetReference>
+        </connector>
+    </assignments>
+
+    <actionCalls>
+        <name>Send_Bell_Notification</name>
+        <label>Send Bell Notification</label>
+        <locationX>176</locationX>
+        <locationY>458</locationY>
+        <actionName>customNotificationAction</actionName>
+        <actionType>customNotificationAction</actionType>
+        <connector>
+            <targetReference>Send_Email</targetReference>
+        </connector>
+        <flowTransactionModel>CurrentTransaction</flowTransactionModel>
+        <inputParameters>
+            <name>customNotifTypeId</name>
+            <value>
+                <elementReference>Get_Notification_Type.Id</elementReference>
+            </value>
+        </inputParameters>
+        <inputParameters>
+            <name>recipientIds</name>
+            <value>
+                <elementReference>RecipientIds</elementReference>
+            </value>
+        </inputParameters>
+        <inputParameters>
+            <name>title</name>
+            <value>
+                <elementReference>Formula_Title_Short</elementReference>
+            </value>
+        </inputParameters>
+        <inputParameters>
+            <name>body</name>
+            <value>
+                <elementReference>Formula_Body_Short</elementReference>
+            </value>
+        </inputParameters>
+        <inputParameters>
+            <name>targetId</name>
+            <value>
+                <elementReference>Get_User_Details.Id</elementReference>
+            </value>
+        </inputParameters>
+    </actionCalls>
+
+    <actionCalls>
+        <name>Send_Email</name>
+        <label>Send Email</label>
+        <locationX>176</locationX>
+        <locationY>566</locationY>
+        <actionName>emailSimple</actionName>
+        <actionType>emailSimple</actionType>
+        <flowTransactionModel>CurrentTransaction</flowTransactionModel>
+        <inputParameters>
+            <name>emailAddresses</name>
+            <value>
+                <elementReference>Get_User_Details.Email</elementReference>
+            </value>
+        </inputParameters>
+        <inputParameters>
+            <name>emailSubject</name>
+            <value>
+                <elementReference>Formula_Email_Subject</elementReference>
+            </value>
+        </inputParameters>
+        <inputParameters>
+            <name>emailBody</name>
+            <value>
+                <elementReference>Formula_Email_Body</elementReference>
+            </value>
+        </inputParameters>
+    </actionCalls>
+
+    <formulas>
+        <name>Reset_Password_Link</name>
+        <dataType>String</dataType>
+        <expression>"https://YOUR_DOMAIN.my.salesforce.com/secur/forgotpassword.jsp?username=" &amp; {!Get_User_Details.Username}</expression>
+    </formulas>
+
+    <formulas>
+        <name>Formula_Title_Short</name>
+        <dataType>String</dataType>
+        <expression>
+            CASE({!Get_User_Details.LanguageLocaleKey},
+            "fr", "Alerte de sécurité",
+            "es", "Alerta de seguridad",
+            "Security Alert")
+        </expression>
+    </formulas>
+
+    <formulas>
+        <name>Formula_Body_Short</name>
+        <dataType>String</dataType>
+        <expression>
+            CASE({!Get_User_Details.LanguageLocaleKey},
+            "fr", "Activité inhabituelle détectée.",
+            "es", "Actividad inusual detectada.",
+            "Unusual activity detected.")
+        </expression>
+    </formulas>
+
+    <formulas>
+        <name>Formula_Email_Subject</name>
+        <dataType>String</dataType>
+        <expression>
+            CASE({!Get_User_Details.LanguageLocaleKey},
+            "fr", "Action requise : Activité inhabituelle",
+            "es", "Acción requerida: Actividad inusual",
+            "Action Required: Unusual Activity")
+        </expression>
+    </formulas>
+
+    <formulas>
+        <name>Formula_Email_Body</name>
+        <dataType>String</dataType>
+        <expression>
+            /* Default English Only for Brevity in this example */
+            "Hello " &amp; {!Get_User_Details.FirstName} &amp; "," &amp; BR() &amp; BR() &amp;
+            "We detected a login attempt from IP: " &amp; {!var_SourceIp} &amp; "." &amp; BR() &amp;
+            "If this wasn't you, reset password here: " &amp; {!Reset_Password_Link}
+        </expression>
+    </formulas>
+
+</Flow>

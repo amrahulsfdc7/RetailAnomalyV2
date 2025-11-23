@@ -1,0 +1,235 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Flow xmlns="http://soap.sforce.com/2006/04/metadata">
+    <apiVersion>60.0</apiVersion>
+    <description>Triggered by ApiAnomalyEvent. Checks User Language, sends localized Bell Notification AND Email with reset link.</description>
+    <label>Api Anomaly Notifier (Email + Bell)</label>
+    <processType>AutoLaunchedFlow</processType>
+    
+    <start>
+        <locationX>50</locationX>
+        <locationY>0</locationY>
+        <connector>
+            <targetReference>Get_User_Details</targetReference>
+        </connector>
+        <object>ApiAnomalyEvent</object>
+        <triggerType>PlatformEvent</triggerType>
+    </start>
+
+    <recordLookups>
+        <name>Get_User_Details</name>
+        <label>Get User Details</label>
+        <locationX>176</locationX>
+        <locationY>134</locationY>
+        <assignNullValuesIfNoRecordsFound>false</assignNullValuesIfNoRecordsFound>
+        <connector>
+            <targetReference>Get_Notification_Type</targetReference>
+        </connector>
+        <filterLogic>and</filterLogic>
+        <filters>
+            <field>Id</field>
+            <operator>EqualTo</operator>
+            <value>
+                <elementReference>$Record.UserId</elementReference>
+            </value>
+        </filters>
+        <getFirstRecordOnly>true</getFirstRecordOnly>
+        <object>User</object>
+        <storeOutputAutomatically>true</storeOutputAutomatically>
+        <queriedFields>Id</queriedFields>
+        <queriedFields>Username</queriedFields>
+        <queriedFields>FirstName</queriedFields>
+        <queriedFields>Email</queriedFields>
+        <queriedFields>LanguageLocaleKey</queriedFields>
+    </recordLookups>
+
+    <recordLookups>
+        <name>Get_Notification_Type</name>
+        <label>Get Notification Type</label>
+        <locationX>176</locationX>
+        <locationY>242</locationY>
+        <assignNullValuesIfNoRecordsFound>false</assignNullValuesIfNoRecordsFound>
+        <connector>
+            <targetReference>Assign_Recipient_ID</targetReference>
+        </connector>
+        <filterLogic>and</filterLogic>
+        <filters>
+            <field>DeveloperName</field>
+            <operator>EqualTo</operator>
+            <value>
+                <stringValue>Security_Alert</stringValue>
+            </value>
+        </filters>
+        <getFirstRecordOnly>true</getFirstRecordOnly>
+        <object>CustomNotificationType</object>
+        <storeOutputAutomatically>true</storeOutputAutomatically>
+    </recordLookups>
+
+    <assignments>
+        <name>Assign_Recipient_ID</name>
+        <label>Assign Recipient ID</label>
+        <locationX>176</locationX>
+        <locationY>350</locationY>
+        <assignmentItems>
+            <assignToReference>RecipientIds</assignToReference>
+            <operator>Add</operator>
+            <value>
+                <elementReference>Get_User_Details.Id</elementReference>
+            </value>
+        </assignmentItems>
+        <connector>
+            <targetReference>Send_Localized_Bell_Notification</targetReference>
+        </connector>
+    </assignments>
+
+    <actionCalls>
+        <name>Send_Localized_Bell_Notification</name>
+        <label>Send Localized Bell Notification</label>
+        <locationX>176</locationX>
+        <locationY>458</locationY>
+        <actionName>customNotificationAction</actionName>
+        <actionType>customNotificationAction</actionType>
+        <connector>
+            <targetReference>Send_Localized_Email</targetReference>
+        </connector>
+        <flowTransactionModel>CurrentTransaction</flowTransactionModel>
+        <inputParameters>
+            <name>customNotifTypeId</name>
+            <value>
+                <elementReference>Get_Notification_Type.Id</elementReference>
+            </value>
+        </inputParameters>
+        <inputParameters>
+            <name>recipientIds</name>
+            <value>
+                <elementReference>RecipientIds</elementReference>
+            </value>
+        </inputParameters>
+        <inputParameters>
+            <name>title</name>
+            <value>
+                <elementReference>Formula_Title_Short</elementReference>
+            </value>
+        </inputParameters>
+        <inputParameters>
+            <name>body</name>
+            <value>
+                <elementReference>Formula_Body_Short</elementReference>
+            </value>
+        </inputParameters>
+        <inputParameters>
+            <name>targetId</name>
+            <value>
+                <elementReference>Get_User_Details.Id</elementReference>
+            </value>
+        </inputParameters>
+    </actionCalls>
+
+    <actionCalls>
+        <name>Send_Localized_Email</name>
+        <label>Send Localized Email</label>
+        <locationX>176</locationX>
+        <locationY>566</locationY>
+        <actionName>emailSimple</actionName>
+        <actionType>emailSimple</actionType>
+        <flowTransactionModel>CurrentTransaction</flowTransactionModel>
+        <inputParameters>
+            <name>emailAddresses</name>
+            <value>
+                <elementReference>Get_User_Details.Email</elementReference>
+            </value>
+        </inputParameters>
+        <inputParameters>
+            <name>emailSubject</name>
+            <value>
+                <elementReference>Formula_Email_Subject</elementReference>
+            </value>
+        </inputParameters>
+        <inputParameters>
+            <name>emailBody</name>
+            <value>
+                <elementReference>Formula_Email_Body</elementReference>
+            </value>
+        </inputParameters>
+    </actionCalls>
+
+    <variables>
+        <name>RecipientIds</name>
+        <dataType>String</dataType>
+        <isCollection>true</isCollection>
+        <isInput>false</isInput>
+        <isOutput>false</isOutput>
+    </variables>
+
+    <formulas>
+        <name>Reset_Password_Link</name>
+        <dataType>String</dataType>
+        <expression>"https://YOUR_DOMAIN.my.salesforce.com/secur/forgotpassword.jsp?username=" &amp; {!Get_User_Details.Username}</expression>
+    </formulas>
+
+    <formulas>
+        <name>Formula_Title_Short</name>
+        <dataType>String</dataType>
+        <expression>
+            CASE({!Get_User_Details.LanguageLocaleKey},
+            "fr", "Alerte de sécurité",
+            "es", "Alerta de seguridad",
+            "de", "Sicherheitswarnung",
+            "Security Alert")
+        </expression>
+    </formulas>
+
+    <formulas>
+        <name>Formula_Body_Short</name>
+        <dataType>String</dataType>
+        <expression>
+            CASE({!Get_User_Details.LanguageLocaleKey},
+            "fr", "Activité inhabituelle détectée. Cliquez pour réinitialiser.",
+            "es", "Actividad inusual detectada. Haga clic para restablecer.",
+            "de", "Ungewöhnliche Aktivität erkannt. Klicken Sie zum Zurücksetzen.",
+            "Unusual activity detected. Click here to review.")
+        </expression>
+    </formulas>
+
+    <formulas>
+        <name>Formula_Email_Subject</name>
+        <dataType>String</dataType>
+        <expression>
+            CASE({!Get_User_Details.LanguageLocaleKey},
+            "fr", "Action requise : Activité inhabituelle sur votre compte",
+            "es", "Acción requerida: Actividad inusual en su cuenta",
+            "de", "Handlungsbedarf: Ungewöhnliche Kontoaktivität",
+            "Action Required: Unusual Activity on Your Account")
+        </expression>
+    </formulas>
+
+    <formulas>
+        <name>Formula_Email_Body</name>
+        <dataType>String</dataType>
+        <expression>
+            CASE({!Get_User_Details.LanguageLocaleKey},
+            
+            "fr", 
+            "Bonjour " &amp; {!Get_User_Details.FirstName} &amp; "," &amp; BR() &amp; BR() &amp;
+            "Nous avons détecté une anomalie API liée à votre compte." &amp; BR() &amp;
+            "Si vous n'êtes pas à l'origine de cette connexion, veuillez réinitialiser votre mot de passe immédiatement en utilisant ce lien :" &amp; BR() &amp;
+            {!Reset_Password_Link} &amp; BR() &amp; BR() &amp;
+            "Cordialement," &amp; BR() &amp; "L'équipe de sécurité",
+            
+            "es", 
+            "Hola " &amp; {!Get_User_Details.FirstName} &amp; "," &amp; BR() &amp; BR() &amp;
+            "Hemos detectado una anomalía en la API vinculada a su cuenta." &amp; BR() &amp;
+            "Si no ha iniciado esta conexión, restablezca su contraseña inmediatamente usando este enlace:" &amp; BR() &amp;
+            {!Reset_Password_Link} &amp; BR() &amp; BR() &amp;
+            "Saludos," &amp; BR() &amp; "El equipo de seguridad",
+            
+            /* Default English */
+            "Hello " &amp; {!Get_User_Details.FirstName} &amp; "," &amp; BR() &amp; BR() &amp;
+            "We detected an API anomaly linked to your account." &amp; BR() &amp;
+            "If you did not initiate this connection, please reset your password immediately using this link:" &amp; BR() &amp;
+            {!Reset_Password_Link} &amp; BR() &amp; BR() &amp;
+            "Regards," &amp; BR() &amp; "Security Team"
+            )
+        </expression>
+    </formulas>
+
+</Flow>
